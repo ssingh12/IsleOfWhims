@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Isle of Whims</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%9D%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<meta name="description" content="A party game prototype: secret fates, creatures that think for themselves, and gods who can only nudge.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+/* Layout: the island is the stage; a narrow control rail sits beside it on wide screens and under it on phones. One deliberate night-lagoon look. */
+:root{
+  --sea:#0b2630; --panel:#123742; --panel-2:#1a4654; --line:#285e70;
+  --ink:#eaf3ef; --muted:#97b9b2; --sun:#f3b443; --on-sun:#2b1b00; --ember:#ea6a42; --dread:#b48cf0; --rain:#6fb7e8;
+  --p1:#f3b443; --p2:#7cc47a; --p3:#6fb7e8; --p4:#ee8fb3; --p5:#c3a2f2;
+  --f-display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --f-body:"Nunito Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--sea);color:var(--ink);touch-action:manipulation}
+body{font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 32px}
+.app{max-width:1140px;margin:0 auto}
+.screen{display:flex;flex-direction:column;gap:20px}
+.eyebrow{font:700 12px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--sun);margin:0}
+h1{font:700 clamp(42px,9vw,76px)/.92 var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:700 12px/1.2 var(--f-body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0}
+p{margin:0}
+.lede{max-width:52ch;font-size:18px;line-height:1.5}
+.small{font-size:13px;color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+button:disabled{cursor:not-allowed}
+.primary{background:var(--sun);color:var(--on-sun);border:0;border-radius:999px;padding:13px 24px;font:600 17px/1 var(--f-display);align-self:flex-start;transition:transform .12s}
+.primary:hover{transform:translateY(-1px)}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600}
+.ghost[aria-pressed="true"]{background:var(--panel-2)}
+
+/* setup */
+.setup{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px;align-items:start;padding-top:12px}
+.setup .intro{display:flex;flex-direction:column;gap:20px}
+.field{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.field span{font-weight:700}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.stepper button{background:transparent;border:0;width:44px;height:40px;font-size:20px}
+.stepper button:hover{background:var(--panel-2)}
+.stepper output{min-width:34px;text-align:center;font:600 20px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.rules{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.rules ol,.rules ul{margin:0 0 6px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.rules ul{list-style:none;padding:0}
+.rules ul li{padding:8px 12px;background:var(--panel-2);border-radius:10px;font-weight:600}
+
+/* deal */
+.deal{align-items:center;text-align:center;padding-top:6vh}
+.dealcard{width:min(440px,100%);min-height:280px;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:30px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
+.dealcard .primary{align-self:center}
+.who{font:600 22px/1.25 var(--f-display);display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.fate{font:700 30px/1.15 var(--f-display);color:var(--sun);text-wrap:balance}
+
+/* play */
+.play{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+.stage{display:flex;flex-direction:column;gap:10px;min-width:0}
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sun{flex:1 1 180px;display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:14px}
+.sun b{font:600 18px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--sun)}
+.bar{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--sun),var(--ember))}
+.mapwrap{position:relative;width:100%;max-width:min(100%,76vh);margin:0 auto;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+canvas{display:block;width:100%;aspect-ratio:1;touch-action:manipulation}
+canvas.aiming{cursor:crosshair}
+.banner{position:absolute;inset:auto 0 0 0;padding:18px;background:linear-gradient(transparent,rgba(5,20,26,.92) 35%);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.banner p{font:700 clamp(22px,4vw,30px)/1.1 var(--f-display)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted);justify-content:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:10px;border-radius:3px;display:inline-block}
+
+.rail{display:flex;flex-direction:column;gap:12px;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:7px 12px 7px 10px;font-weight:700;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--panel-2);border-color:var(--ink)}
+.chip em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600}
+.powers{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.power{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 11px;display:flex;flex-direction:column;gap:3px;transition:border-color .12s,background .12s}
+.power:hover:not(:disabled){border-color:var(--muted)}
+.power[aria-pressed="true"]{border-color:var(--sun);background:var(--panel-2)}
+.power:disabled{opacity:.38}
+.power .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.power b{font:600 16px/1.1 var(--f-display)}
+.power .cost{font-size:12px;font-weight:700;color:var(--sun);font-variant-numeric:tabular-nums;white-space:nowrap}
+.power small{font-size:12px;line-height:1.3;color:var(--muted)}
+.hint{font-size:13.5px;min-height:2.6em;color:var(--ink);background:var(--panel);border-radius:10px;padding:8px 11px}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;font-size:13.5px}
+.log li{display:flex;gap:10px}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;width:2.6em}
+.log li.big span{font-weight:700;color:var(--sun)}
+
+/* reveal */
+.reveal{max-width:680px;margin:0 auto;padding-top:4vh}
+.reveal h1{font-size:clamp(34px,7vw,56px)}
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 16px}
+.row.win{border-color:var(--sun);background:var(--panel-2)}
+.row .nm{font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.row .ft{font-weight:600}
+.row .sp{font-size:12.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.row .badge{display:block;font:600 13px/1 var(--f-display);color:var(--sun);margin-bottom:3px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+
+.btnrow2{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ghost.big{padding:12px 20px;font:600 16px/1 var(--f-display)}
+/* phone lobby */
+.lobby{gap:18px}
+.lobby h1{font-size:clamp(32px,6vw,48px)}
+.qrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.qcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;min-width:0}
+.qr{background:#fff;padding:8px;border-radius:10px;width:164px;height:164px;display:flex;align-items:center;justify-content:center}
+.qr img,.qr canvas{width:148px!important;height:148px!important}
+.qstat{font-size:13px;font-weight:700;color:var(--muted)}
+.qstat.on{color:var(--p2)}
+.qlink{font-size:11px;color:var(--muted);word-break:break-all;user-select:all}
+/* phone controller */
+.ctrl{max-width:520px;margin:0 auto;gap:14px}
+.chead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chead .who{font:600 24px/1 var(--f-display);justify-content:flex-start}
+.ctok{font:600 20px/1 var(--f-display);color:var(--sun);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cstatus{font-weight:600;background:var(--panel);border-radius:10px;padding:10px 12px}
+.fatebtn{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
+.fatebtn small{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.fatebtn b{font:700 22px/1.15 var(--f-display);color:var(--sun)}
+.cmap{border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.cclock{font:600 16px/1 var(--f-display);color:var(--sun);font-variant-numeric:tabular-nums}
+.hint.ok{background:var(--panel-2)}
+#cPowers{grid-template-columns:repeat(3,1fr);gap:6px}
+#cPowers .power{padding:10px 8px;align-items:flex-start}
+#cPowers .power small{display:none}
+#cPowers .power .top{flex-direction:column;align-items:flex-start;gap:2px}
+.ctrl .fatebtn{padding:10px 14px}
+.ctrl .fatebtn b{font-size:19px}
+.hint.bad{background:#3a2420}
+
+@media (max-width:860px){
+  .setup,.play{grid-template-columns:minmax(0,1fr)}
+  .setup{gap:26px}
+}
+@media (max-width:420px){
+  .row{grid-template-columns:minmax(0,1fr) auto}
+  .row .nm{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){.primary{transition:none}}
+</style>
+</head>
+<body>
+<main class="app">
+  <section id="setup" class="screen setup">
+    <div class="intro">
+      <p class="eyebrow">Party game prototype</p>
+      <h1>Isle of Whims</h1>
+      <p class="lede">Each player is a minor god with a secret fate in mind. The creatures think for themselves. All you can do is nudge the island around them.</p>
+      <div class="field">
+        <span>Gods at the table</span>
+        <div class="stepper"><button id="pm" aria-label="Fewer players">−</button><output id="pc">3</output><button id="pp" aria-label="More players">+</button></div>
+      </div>
+      <div class="btnrow2"><button id="startBtn" class="primary">Deal the fates</button><button id="phonesBtn" class="ghost big" disabled>Play with phones</button></div>
+      <p id="phonesNote" class="small">Deal the fates passes this screen round. Play with phones turns each friend's phone into their own controller. No accounts or sign-in needed.</p>
+      <p class="small">© 2026 Samit. All rights reserved. Prototype for playtesting.</p>
+    </div>
+    <div class="rules">
+      <h2>How a round goes</h2>
+      <ol>
+        <li>Pass the phone round. Each god secretly sees one fate.</li>
+        <li>The island wakes. Anyone can spend their 60 tokens on nudges, at any time.</li>
+        <li>The first fate to come true ends the round. Its god wins.</li>
+      </ol>
+      <h2>The six fates</h2>
+      <ul id="fateList"></ul>
+    </div>
+  </section>
+
+  <section id="deal" class="screen deal" hidden>
+    <p class="eyebrow" id="dealStep">Fate 1 of 3</p>
+    <div class="dealcard">
+      <p id="dealWho" class="who"></p>
+      <p id="dealFate" class="fate" hidden></p>
+      <button id="dealBtn" class="primary">Show my fate</button>
+    </div>
+    <p class="small">Keep your fate to yourself. Everyone else looks away.</p>
+  </section>
+
+  <section id="play" class="screen play" hidden>
+    <div class="stage">
+      <div class="topbar">
+        <div class="sun"><span><b id="clock">2:30</b> until sunset</span><div class="bar"><i id="sunbar"></i></div></div>
+        <button id="pauseBtn" class="ghost" aria-pressed="false">Pause</button>
+        <button id="mindsBtn" class="ghost" aria-pressed="true">Minds shown</button>
+      </div>
+      <div class="mapwrap">
+        <canvas id="cv" aria-label="The island, seen from above"></canvas>
+        <div id="banner" class="banner" hidden><p id="bannerText"></p><button id="revealBtn" class="primary">Reveal the fates</button></div>
+      </div>
+      <p class="legend">
+        <span><i class="sw" style="background:#aa9664"></i>Wet sand: the crocodile can reach it</span>
+        <span><i class="sw" style="background:#3a2818"></i>Rabbit burrow</span>
+        <span><i class="sw" style="border:2px dashed var(--rain);background:transparent"></i>The human's watering spot</span>
+        <span><i class="sw" style="background:var(--sun)"></i>Hunger</span>
+        <span><i class="sw" style="background:var(--ember)"></i>Fear</span>
+        <span><i class="sw" style="background:var(--rain)"></i>Thirst</span>
+      </p>
+    </div>
+    <aside class="rail">
+      <h2>Who is acting?</h2>
+      <div id="chips" class="chips"></div>
+      <h2>Nudges</h2>
+      <div id="powers" class="powers"></div>
+      <p id="hint" class="hint">Pick who is acting, then pick a nudge.</p>
+      <button id="revealBtn2" class="primary" hidden>Reveal the fates</button>
+      <h2>Island log</h2>
+      <ol id="log" class="log"></ol>
+    </aside>
+  </section>
+
+  <section id="lobby" class="screen lobby" hidden>
+    <p class="eyebrow">Play with phones</p>
+    <h1>Scan your player code</h1>
+    <p class="lede">Each god scans their own code. Your phone shows your secret fate, your tokens and the nudges. This screen shows the island.</p>
+    <div id="qrs" class="qrs"></div>
+    <p id="lobbyNote" class="small">Connecting this screen…</p>
+    <div class="btnrow2"><button id="wakeBtn" class="primary">Wake the island</button><button id="lobbyBack" class="ghost big">Back</button></div>
+  </section>
+
+  <section id="ctrl" class="screen ctrl" hidden>
+    <div class="chead"><p id="cWho" class="who"></p><span id="cTok" class="ctok"></span></div>
+    <p id="cStatus" class="cstatus">Connecting to the island…</p>
+    <button id="cFate" class="fatebtn"><small>Your secret fate</small><b id="cFateText">Tap to show</b></button>
+    <div class="topbar"><span id="cClock" class="cclock"></span></div>
+    <div id="cPowers" class="powers"></div>
+    <p id="cHint" class="hint">Pick a nudge, then tap the map.</p>
+    <div class="cmap"><canvas id="ccv" aria-label="Live map of the island"></canvas></div>
+  </section>
+
+  <section id="reveal" class="screen reveal" hidden>
+    <p class="eyebrow">The fates, unmasked</p>
+    <h1 id="revHead"></h1>
+    <p id="revSub" class="lede"></p>
+    <div id="rows" class="rows"></div>
+    <div class="btnrow"><button id="againBtn" class="primary">Deal again</button><button id="tableBtn" class="ghost">Change players</button></div>
+  </section>
+</main>
+
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script id="sim">
+// ---------- Simulation (no DOM in here) ----------
+const FATES=[
+  {id:'fox_rabbit',text:'The fox catches a rabbit'},
+  {id:'croc_human',text:'The crocodile catches the human'},
+  {id:'croc_fox',text:'The crocodile catches the fox'},
+  {id:'croc_rabbit',text:'The crocodile catches a rabbit'},
+  {id:'carrots',text:'The rabbits eat 7 carrots'},
+  {id:'peace',text:'Nobody is eaten before sunset'},
+];
+const OUTCOME={fox_rabbit:'The fox caught a rabbit.',croc_human:'The crocodile caught the human.',croc_fox:'The crocodile caught the fox.',
+  croc_rabbit:'The crocodile caught a rabbit.',carrots:'The rabbits ate their seventh carrot.',peace:'The sun set. Nobody was eaten.'};
+const DAY=150, CARROT_GOAL=7, CROC_REACH=0.1;
+const KIND={
+  rabbit:{sight:20,walk:6,sprint:14,stam:5,hungerRate:1.1,emoji:'🐇',name:'a rabbit',size:4.6},
+  fox:{sight:25,walk:5.2,sprint:12.5,stam:3.5,hungerRate:0.8,emoji:'🦊',name:'the fox',size:5},
+  human:{sight:35,walk:4.5,sprint:9,stam:5,hungerRate:0.5,emoji:'🧍',name:'the human',size:5.4},
+  croc:{sight:20,walk:4,sprint:11,stam:1.6,hungerRate:1,emoji:'🐊',name:'the crocodile',size:6},
+};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+let S=null;
+let emitLog=()=>{}, onEnd=()=>{};
+
+function H(x,y){ // island height: ~1 at the central highland, 0 at the normal coastline
+  const dx=x-50,dy=y-50,r=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
+  const edge=37+4*Math.sin(3*a+0.7)+2.5*Math.sin(5*a+2)+1.5*Math.sin(9*a+1);
+  return 1-r/edge+0.05*Math.sin(x*0.23+1)*Math.cos(y*0.19);
+}
+const inBounds=(x,y)=>x>1.5&&x<98.5&&y>1.5&&y<98.5;
+const inFire=(x,y)=>S.fires.some(f=>Math.hypot(x-f.x,y-f.y)<f.r);
+function valid(c,x,y){
+  if(!inBounds(x,y))return false;
+  const h=H(x,y);
+  if(c.kind==='croc')return h<S.sea+CROC_REACH;
+  return h>S.sea&&!inFire(x,y);
+}
+function landPoint(lo,hi,avoid=[],minD=0){
+  for(let i=0;i<500;i++){const x=rand(8,92),y=rand(8,92),e=H(x,y)-S.sea;
+    if(e>lo&&e<hi&&!inFire(x,y)&&avoid.every(a=>Math.hypot(a.x-x,a.y-y)>=minD))return{x,y}}
+  return{x:50,y:50};
+}
+function coastPoint(x,y,landSide){ // walk out from the centre along this creature's bearing
+  let dx=x-50,dy=y-50,l=Math.hypot(dx,dy); if(l<0.01){dx=1;dy=0;l=1} dx/=l;dy/=l;
+  for(let r=0;r<72;r+=0.5){const px=50+dx*r,py=50+dy*r,h=H(px,py);
+    if(landSide?h<=S.sea+0.03:h<S.sea-0.06)return{x:clamp(px,3,97),y:clamp(py,3,97)}}
+  return{x:clamp(50+dx*47,3,97),y:clamp(50+dy*47,3,97)};
+}
+
+function newSim(){
+  S={t:0,tick:0,sea:0,flood:null,creatures:[],carrots:[],fires:[],gales:[],carrotsEaten:0,carrotTimer:0,over:null,paused:false,touch:{},nid:0,burrows:[],spot:null};
+  const add=(kind,p)=>{const k=KIND[kind];
+    const c={id:S.nid++,kind,...k,x:p.x,y:p.y,ix:0,iy:0,stamina:k.stam,tired:false,hunger:rand(15,35),thirst:kind==='human'?rand(25,40):0,
+      fear:0,state:'wander',wx:p.x,wy:p.y,wtime:0,nudges:[],alive:true,glow:0,glowCol:'#fff',seed:Math.random()*10,moving:false,halt:false,wantSprint:false};
+    if(kind==='croc')c.hunger=45;
+    if(kind==='fox')c.hunger=rand(0,15);
+    S.creatures.push(c);return c};
+  for(let i=0;i<3;i++)S.burrows.push(landPoint(0.25,0.7,S.burrows,22));
+  {const a=rand(0,Math.PI*2);S.spot=coastPoint(50+Math.cos(a)*10,50+Math.sin(a)*10,true)}
+  add('human',{x:50,y:47});
+  const r1=add('rabbit',landPoint(0.2,0.6,[{x:50,y:47}],10));
+  const r2=add('rabbit',landPoint(0.2,0.6,[r1],12));
+  add('fox',landPoint(0.25,0.7,[r1,r2],30));
+  add('croc',coastPoint(50+rand(-8,8),95,false));
+  for(let i=0;i<5;i++)S.carrots.push(landPoint(0.22,0.65));
+}
+
+function drive(c,key){ // Drive_final = (D_base * I_divine) + F_decay, with the nudge fading over its duration
+  let mult=1,add=0;
+  for(const n of c.nudges){if(n.key!==key)continue;const k=1-n.t/n.dur;mult*=1+(n.mult-1)*k;add+=n.add*k}
+  return clamp(c[key]*mult+add,0,100);
+}
+function setDir(c,dx,dy,sprint){const l=Math.hypot(dx,dy);if(l<0.001){c.ix=c.iy=0}else{c.ix=dx/l;c.iy=dy/l}c.wantSprint=!!sprint;c.halt=false}
+const toward=(c,x,y,s)=>setDir(c,x-c.x,y-c.y,s);
+function away(c,x,y,s){ // flee, bending inland so land animals don't run into the shallows
+  let dx=c.x-x,dy=c.y-y;const l=Math.hypot(dx,dy)||1;dx/=l;dy/=l;
+  if(c.kind!=='croc'&&H(c.x,c.y)-S.sea<0.25){const cx=50-c.x,cy=50-c.y,cl=Math.hypot(cx,cy)||1;dx+=cx/cl*0.8;dy+=cy/cl*0.8}
+  setDir(c,dx,dy,s);
+}
+function pickWander(c){
+  for(let i=0;i<40;i++){const x=c.x+rand(-22,22),y=c.y+rand(-22,22);if(!inBounds(x,y))continue;const e=H(x,y)-S.sea;
+    if(c.kind==='croc'){if(i===0&&Math.random()<0.25){const q=coastPoint(S.spot.x,S.spot.y,false);return{x:q.x+rand(-4,4),y:q.y+rand(-4,4)}}if(e<-0.01&&e>-0.2)return{x,y}}
+    else if(e>(c.kind==='human'?0.15:0.08)&&!inFire(x,y))return{x,y}}
+  return c.kind==='croc'?coastPoint(c.x,c.y,false):{x:50,y:50};
+}
+function wander(c,state){
+  const e=H(c.wx,c.wy)-S.sea, ok=c.kind==='croc'?e<0:e>0.05;
+  if(!ok||S.t>c.wtime||Math.hypot(c.wx-c.x,c.wy-c.y)<2){const p=pickWander(c);c.wx=p.x;c.wy=p.y;c.wtime=S.t+rand(6,10)}
+  toward(c,c.wx,c.wy,false);c.state=state;
+}
+function seen(c,kinds,sight=c.sight){
+  const out=[];for(const o of S.creatures){if(!o.alive||o.hidden||o===c||!kinds.includes(o.kind))continue;
+    const d=Math.hypot(o.x-c.x,o.y-c.y);if(d<=sight)out.push({o,d})}
+  return out.sort((a,b)=>a.d-b.d);
+}
+function nearestAny(c,kinds){let b=null;for(const o of S.creatures){if(!o.alive||o.hidden||o===c||!kinds.includes(o.kind))continue;
+  const d=Math.hypot(o.x-c.x,o.y-c.y);if(!b||d<b.d)b={o,d}}return b}
+function nearestCarrot(c,range){let b=null,bd=range;for(const k of S.carrots){const d=Math.hypot(k.x-c.x,k.y-c.y);if(d<bd){bd=d;b=k}}return b}
+function avoidFire(c){
+  let dx=c.ix,dy=c.iy,ch=false;
+  for(const f of S.fires){const ex=c.x-f.x,ey=c.y-f.y,d=Math.hypot(ex,ey);
+    if(d<f.r+6&&d>0.01){const w=(f.r+6-d)/6*1.6;dx+=ex/d*w;dy+=ey/d*w;ch=true}}
+  if(ch){const l=Math.hypot(dx,dy);if(l>0.01){c.ix=dx/l;c.iy=dy/l}}
+}
+
+const BRAIN={
+  rabbit(c){
+    let fb=0,src=null;
+    for(const s of seen(c,['fox','croc'])){const v=100*(1-s.d/c.sight)+40;if(v>fb){fb=v;src=s.o}}
+    c.fear=fb;const fear=drive(c,'fear'),hunger=drive(c,'hunger');
+    if(c.hidden){ // stays down until calm, or until hunger drags it out
+      if(fear>=45&&S.t>c.hideUntil-1)c.hideUntil=S.t+2;
+      if(S.t<c.hideUntil&&hunger<75){c.ix=c.iy=0;c.halt=true;c.state='hide';return}
+      c.hidden=false;
+    }
+    if(fear>=45&&fear>hunger*0.6){ // a starving rabbit gambles
+      if(!src){const n=nearestAny(c,['fox','croc']);src=n&&n.o}
+      let b=null,bd=25;
+      for(const w of S.burrows){const d=Math.hypot(w.x-c.x,w.y-c.y);if(d<bd&&(!src||Math.hypot(w.x-src.x,w.y-src.y)>d)){bd=d;b=w}}
+      if(b&&bd<1.4){c.hidden=true;c.hideUntil=S.t+rand(5,9);c.ix=c.iy=0;c.halt=true;c.state='hide';return}
+      if(b)toward(c,b.x,b.y,true);else src?away(c,src.x,src.y,true):toward(c,50,50,true);
+      c.state='flee';return}
+    if(hunger>35){const k=nearestCarrot(c,45);if(k){toward(c,k.x,k.y,false);c.state='eat';return}}
+    wander(c,'wander');
+  },
+  fox(c){
+    let fb=0,src=null;
+    for(const s of seen(c,['croc'])){const v=100*(1-s.d/c.sight)+30;if(v>fb){fb=v;src=s.o}}
+    for(const s of seen(c,['human'],10)){const v=60*(1-s.d/10)+15;if(v>fb){fb=v;src=s.o}}
+    c.fear=fb;const fear=drive(c,'fear'),hunger=drive(c,'hunger');
+    if(fear>45&&fear>=hunger){
+      if(!src){const n=nearestAny(c,['human','croc']);src=n&&n.o}
+      if(src)away(c,src.x,src.y,true);else wander(c,'flee');c.state='flee';return}
+    if(c.tired&&c.state==='hunt')c.restUntil=S.t+9;
+    if(c.restUntil&&S.t<c.restUntil&&hunger<85){wander(c,'rest');return}
+    if(hunger>40){const r=seen(c,['rabbit'])[0];
+      if(r){toward(c,r.o.x,r.o.y,r.d<14);c.state='hunt';return}
+      wander(c,'prowl');return}
+    wander(c,'wander');
+  },
+  human(c){
+    const drinking=c.state==='drink';
+    let fb=0,src=null;
+    for(const s of seen(c,['croc'],drinking?12:c.sight)){const v=100*(1-s.d/c.sight)+30;if(v>fb){fb=v;src=s.o}}
+    c.fear=fb;const fear=drive(c,'fear'),hunger=drive(c,'hunger'),thirst=c.thirst;
+    if(fear>40&&fear>thirst){
+      if(!src){const n=nearestAny(c,['croc']);src=n&&n.o}
+      src?away(c,src.x,src.y,true):toward(c,50,50,true);c.state='flee';return}
+    if(thirst>55||(drinking&&thirst>5)){
+      if(H(c.x,c.y)<S.sea+0.06){c.ix=c.iy=0;c.halt=true;c.wantSprint=false;c.state='drink';return}
+      const p=H(S.spot.x,S.spot.y)>S.sea?S.spot:coastPoint(c.x,c.y,true);toward(c,p.x,p.y,false);c.state='thirsty';return}
+    if(hunger>60){const k=nearestCarrot(c,60);if(k){toward(c,k.x,k.y,false);c.state='eat';return}}
+    wander(c,'wander');
+  },
+  croc(c){
+    const fear=drive(c,'fear'),hunger=drive(c,'hunger');
+    if(fear>40){const p=coastPoint(c.x,c.y,false);toward(c,clamp(50+(p.x-50)*1.15,3,97),clamp(50+(p.y-50)*1.15,3,97),true);c.state='retreat';return}
+    if(hunger>35){const prey=seen(c,['human','fox','rabbit']);
+      for(const o of S.creatures)if(o.alive&&o.state==='drink'&&!prey.some(p=>p.o===o)){const d=Math.hypot(o.x-c.x,o.y-c.y);if(d<26)prey.push({o,d})}
+      if(prey.length){const r=prey.find(p=>H(p.o.x,p.o.y)<S.sea+CROC_REACH)||prey[0];
+        const reach=H(r.o.x,r.o.y)<S.sea+CROC_REACH, lunge=reach&&r.d<8;
+        toward(c,r.o.x,r.o.y,lunge);c.state=lunge?'hunt':'stalk';return}}
+    wander(c,'patrol');
+  },
+};
+
+function decide(c){
+  if(c.kind!=='croc'){
+    if(H(c.x,c.y)<=S.sea){toward(c,50,50,true);c.state='swim';return}
+    const f=S.fires.find(f=>Math.hypot(c.x-f.x,c.y-f.y)<f.r+0.5);
+    if(f){away(c,f.x,f.y,true);c.state='flee';return}
+  }else if(H(c.x,c.y)>=S.sea+CROC_REACH){const p=coastPoint(c.x,c.y,false);toward(c,p.x,p.y,false);c.state='retreat';return}
+  BRAIN[c.kind](c);
+  if(c.kind!=='croc')avoidFire(c);
+}
+
+function physics(c,dt){
+  c.hunger=clamp(c.hunger+c.hungerRate*dt,0,100);
+  if(c.kind==='human'){c.thirst=clamp(c.thirst+1.6*dt,0,100);if(c.state==='drink')c.thirst=Math.max(0,c.thirst-13*dt)}
+  for(const n of c.nudges)n.t+=dt; c.nudges=c.nudges.filter(n=>n.t<n.dur);
+  c.glow=Math.max(0,c.glow-dt);
+  let spd=c.walk;
+  if(c.wantSprint&&!c.tired){spd=c.sprint;c.stamina-=dt;if(c.stamina<=0){c.stamina=0;c.tired=true}}
+  else{c.stamina=Math.min(c.stam,c.stamina+dt*0.6);if(c.tired&&c.stamina>c.stam*0.6)c.tired=false}
+  if(c.halt)spd=0;
+  // V_actual = V_intent + sum(V_environment)
+  let vx=c.ix*spd,vy=c.iy*spd;
+  for(const g of S.gales){const dx=c.x-g.x,dy=c.y-g.y,d=Math.hypot(dx,dy);
+    if(d<g.r&&d>0.01){const m=g.power*(1-d/g.r)*(1-0.5*g.t/g.dur);vx+=dx/d*m;vy+=dy/d*m}}
+  const nx=c.x+vx*dt,ny=c.y+vy*dt;
+  if(!valid(c,c.x,c.y)){c.x=clamp(nx,1.6,98.4);c.y=clamp(ny,1.6,98.4)} // escaping water, fire or a dry bank
+  else if(valid(c,nx,ny)){c.x=nx;c.y=ny}
+  else if(valid(c,nx,c.y))c.x=nx;
+  else if(valid(c,c.x,ny))c.y=ny;
+  c.moving=Math.hypot(vx,vy)>0.5;
+}
+
+function end(id,victim){
+  if(S.over)return;
+  if(victim)victim.alive=false;
+  S.over={id,victim};
+  emitLog(OUTCOME[id],true);
+  onEnd();
+}
+function interactions(){
+  const al=S.creatures.filter(c=>c.alive&&!c.hidden);
+  for(const a of al)for(const b of al){if(a===b)continue;const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(a.kind==='fox'&&b.kind==='rabbit'&&d<1.2)return end('fox_rabbit',b);
+    if(a.kind==='croc'&&b.kind!=='croc'&&d<2)return end('croc_'+b.kind,b)}
+  for(const c of al){
+    if(c.kind!=='rabbit'&&c.kind!=='human')continue;
+    if(drive(c,'hunger')<(c.kind==='rabbit'?20:50))continue;
+    const i=S.carrots.findIndex(k=>Math.hypot(k.x-c.x,k.y-c.y)<1.8);
+    if(i<0)continue;
+    S.carrots.splice(i,1);c.hunger=Math.max(0,c.hunger-70);c.nudges=c.nudges.filter(n=>n.key!=='hunger');
+    if(c.kind==='rabbit'){S.carrotsEaten++;emitLog(`A rabbit munches a carrot (${S.carrotsEaten} of ${CARROT_GOAL}).`);
+      if(S.carrotsEaten>=CARROT_GOAL)return end('carrots')}
+    else emitLog('The human eats a carrot.');
+  }
+}
+function step(dt){
+  S.t+=dt;S.tick++;
+  if(S.flood){S.flood.t+=dt;const t=S.flood.t;
+    S.sea=t<4?0.5*t/4:t<22?0.5:t<28?0.5*(1-(t-22)/6):0;
+    if(t>=28){S.flood=null;S.sea=0;emitLog('The water drains back to the sea.')}}
+  S.carrots=S.carrots.filter(k=>H(k.x,k.y)>S.sea+0.02&&!inFire(k.x,k.y));
+  for(const f of S.fires)f.t+=dt; S.fires=S.fires.filter(f=>f.t<f.dur&&H(f.x,f.y)>S.sea);
+  for(const g of S.gales)g.t+=dt; S.gales=S.gales.filter(g=>g.t<g.dur);
+  S.carrotTimer+=dt;if(S.carrotTimer>7){S.carrotTimer=0;if(S.carrots.length<6)S.carrots.push(landPoint(0.22,0.65))}
+  if(S.tick%5===0)for(const c of S.creatures)if(c.alive)decide(c); // brains think 4x a second
+  for(const c of S.creatures)if(c.alive)physics(c,dt);
+  interactions();
+  if(!S.over&&S.t>=DAY)end('peace');
+}
+</script>
+
+<script>
+// ---------- Game UI ----------
+const $=s=>document.querySelector(s);
+const POWERS=[
+  {id:'hunger',name:'Hunger',cost:8,target:'creature',desc:'One creature turns ravenous for a while'},
+  {id:'dread',name:'Dread',cost:8,target:'creature',desc:'One creature is gripped by fear'},
+  {id:'lure',name:'Lure',cost:6,target:'land',desc:'A carrot grows where you tap'},
+  {id:'gale',name:'Gale',cost:12,target:'point',desc:'Blasts creatures away from a spot'},
+  {id:'wildfire',name:'Wildfire',cost:25,target:'land',desc:'A patch of grass burns and blocks the way'},
+  {id:'monsoon',name:'Monsoon',cost:50,target:'none',desc:'The lowlands flood. Everyone climbs.'},
+];
+const PCOL=['var(--p1)','var(--p2)','var(--p3)','var(--p4)','var(--p5)'];
+const START_TOKENS=60;
+const ICON={flee:'❗',hunt:'🎯',stalk:'👀',eat:'🥕',thirsty:'💧',drink:'💧',retreat:'💨',swim:'🌊',prowl:'👃'};
+const EMOJI_FONT='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+let mode='local',players=[],playerCount=3,active=0,pending=null,showMinds=true,dealIdx=0,dealShown=false,lastSea=-1,endWall=0;
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+const fmt=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+
+function show(id){for(const s of document.querySelectorAll('.screen'))s.hidden=s.id!==id;window.scrollTo(0,0);if(id==='play')resize()}
+
+// setup
+$('#fateList').innerHTML=FATES.map(f=>`<li>${f.text}</li>`).join('');
+const setCount=n=>{playerCount=Math.max(2,Math.min(5,n));$('#pc').textContent=playerCount};
+$('#pm').onclick=()=>setCount(playerCount-1);
+$('#pp').onclick=()=>setCount(playerCount+1);
+$('#startBtn').onclick=startDeal;
+
+// deal
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function startDeal(){
+  const deck=shuffle(FATES.slice());
+  players=Array.from({length:playerCount},(_,i)=>({name:'Player '+(i+1),fate:deck[i],tokens:START_TOKENS,spent:0,color:PCOL[i]}));
+  dealIdx=0;dealShown=false;renderDeal();show('deal');
+}
+function renderDeal(){
+  const p=players[dealIdx];
+  $('#dealStep').textContent=`Fate ${dealIdx+1} of ${players.length}`;
+  const who=$('#dealWho');who.innerHTML='';
+  const dot=document.createElement('i');dot.className='dot';dot.style.background=p.color;
+  who.append(dot,document.createTextNode(dealShown?`${p.name}, your fate is`:`Pass the phone to ${p.name}`));
+  $('#dealFate').hidden=!dealShown;$('#dealFate').textContent=dealShown?p.fate.text:'';
+  $('#dealBtn').textContent=!dealShown?'Show my fate':dealIdx<players.length-1?'Hide it and pass on':'Hide it and wake the island';
+}
+$('#dealBtn').onclick=()=>{
+  if(!dealShown)dealShown=true;
+  else{dealShown=false;dealIdx++;if(dealIdx>=players.length){startGame();return}}
+  renderDeal();
+};
+
+// play
+function startGame(){
+  newSim();active=0;pending=null;lastSea=-1;
+  $('#log').innerHTML='';$('#banner').hidden=true;$('#revealBtn2').hidden=true;
+  $('#pauseBtn').textContent='Pause';$('#pauseBtn').setAttribute('aria-pressed','false');
+  renderRail();setHint();show('play');
+  emitLog('Dawn breaks over the island.');
+}
+emitLog=(t,big)=>{
+  const li=document.createElement('li');if(big)li.className='big';
+  const tm=document.createElement('time');tm.textContent=fmt(S?S.t:0);
+  const sp=document.createElement('span');sp.textContent=t;
+  li.append(tm,sp);const log=$('#log');log.prepend(li);
+  while(log.children.length>40)log.lastChild.remove();
+};
+onEnd=()=>{endWall=performance.now();pending=null;$('#bannerText').textContent=OUTCOME[S.over.id];$('#banner').hidden=false;$('#revealBtn2').hidden=false;renderRail();setHint();
+  const r=$('#cv').getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)$('#cv').scrollIntoView({block:'center',behavior:'smooth'})};
+
+function renderRail(){
+  const chips=$('#chips');chips.innerHTML='';
+  players.forEach((p,i)=>{const b=document.createElement('button');b.className='chip';b.setAttribute('aria-pressed',i===active);
+    b.innerHTML=`<i class="dot" style="background:${p.color}"></i>${p.name}<em>${p.tokens}</em>`;
+    b.onclick=()=>{active=i;pending=null;renderRail();setHint()};chips.append(b)});
+  const pw=$('#powers');pw.innerHTML='';
+  const tk=players[active]?players[active].tokens:0;
+  for(const P of POWERS){const b=document.createElement('button');b.className='power';
+    b.disabled=!S||!!S.over||tk<P.cost||(P.id==='monsoon'&&!!S.flood);
+    b.setAttribute('aria-pressed',pending===P.id);
+    b.innerHTML=`<span class="top"><b>${P.name}</b><span class="cost">${P.cost} tokens</span></span><small>${P.desc}</small>`;
+    b.onclick=()=>{if(P.target==='none'){usePower(P.id,50,50);return}pending=pending===P.id?null:P.id;renderRail();setHint()};
+    pw.append(b)}
+  $('#cv').classList.toggle('aiming',!!pending);
+}
+function setHint(t){
+  if(t){$('#hint').textContent=t;return}
+  if(S&&S.over){$('#hint').textContent='The round is over. Tap Reveal the fates to see who won, then Deal again.';return}
+  const p=players[active],P=POWERS.find(x=>x.id===pending);
+  $('#hint').textContent=!P?`${p.name} is acting. Pick a nudge.`:P.target==='creature'?`Tap a creature to give it ${P.name}.`:P.target==='land'?`Tap dry land for ${P.name}.`:`Tap anywhere for the ${P.name}.`;
+}
+function usePower(pid,x,y,pi=active,remote=false){
+  const done=(ok,m)=>{if(!remote&&!ok)setHint(m);return{ok,msg:m}};
+  if(!S||S.over)return done(false,'The round is over.');
+  const P=POWERS.find(p=>p.id===pid),pl=players[pi];
+  if(!P||!pl)return done(false,'Unknown nudge.');
+  if(pl.tokens<P.cost)return done(false,`${pl.name} needs ${P.cost} tokens for ${P.name}.`);
+  let msg;
+  if(P.target==='creature'){
+    let best=null;for(const c of S.creatures){if(!c.alive)continue;const d=Math.hypot(c.x-x,c.y-y);if(d<9&&(!best||d<best.d))best={c,d}}
+    if(!best)return done(false,'Tap closer to a creature.');
+    const c=best.c;
+    if(pid==='hunger'){c.nudges.push({key:'hunger',mult:1.5,add:30,t:0,dur:15});c.glowCol='#f3b443';msg=cap(c.name)+' looks suddenly ravenous.'}
+    else{c.nudges.push({key:'fear',mult:1,add:70,t:0,dur:10});c.glowCol='#b48cf0';msg=cap(c.name)+' flinches at something unseen.'}
+    c.glow=1.6;
+    const prev=S.touch[c.id];if(prev&&prev.p!==pi&&S.t-prev.t<8)msg+=' Rival gods are pulling at it.';
+    S.touch[c.id]={p:pi,t:S.t};
+    decide(c);
+  }else if(pid==='lure'){
+    if(H(x,y)<=S.sea+0.05||inFire(x,y))return done(false,'Lures only grow on dry land.');
+    S.carrots.push({x,y});msg='A carrot pushes up through the soil.';
+  }else if(pid==='gale'){
+    S.gales.push({x,y,r:18,power:17,t:0,dur:2.5});msg='A gale tears across the island.';
+  }else if(pid==='wildfire'){
+    if(H(x,y)<=S.sea+0.05)return done(false,'Fire needs dry ground.');
+    S.fires.push({x,y,r:6.5,t:0,dur:14});msg='Smoke rises from the grass.';
+  }else if(pid==='monsoon'){
+    if(S.flood)return done(false,'The monsoon is already here.');
+    S.flood={t:0};msg='The sky opens. The sea is rising.';
+  }
+  pl.tokens-=P.cost;pl.spent+=P.cost;if(!remote)pending=null;emitLog(msg);renderRail();setHint();
+  return{ok:true,msg:`${P.name} cast. ${msg}`};
+}
+
+const cv=$('#cv'),ctx=cv.getContext('2d');
+cv.addEventListener('pointerdown',e=>{
+  if(!pending||!S||S.over)return;
+  const r=cv.getBoundingClientRect();
+  usePower(pending,(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100);
+});
+$('#pauseBtn').onclick=()=>{if(!S)return;S.paused=!S.paused;$('#pauseBtn').textContent=S.paused?'Resume':'Pause';$('#pauseBtn').setAttribute('aria-pressed',S.paused)};
+$('#mindsBtn').onclick=()=>{showMinds=!showMinds;$('#mindsBtn').textContent=showMinds?'Minds shown':'Minds hidden';$('#mindsBtn').setAttribute('aria-pressed',showMinds)};
+$('#revealBtn').onclick=showReveal;
+$('#revealBtn2').onclick=showReveal;
+$('#againBtn').onclick=()=>mode==='phones'?startPhones():startDeal();
+$('#tableBtn').onclick=()=>{mode='local';show('setup')};
+
+function resize(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1),w=Math.round(r.width*dpr);if(w>0&&cv.width!==w){cv.width=cv.height=w}}
+new ResizeObserver(resize).observe(cv);
+
+// terrain, cached and redrawn only when the sea level moves
+const TR=200,tCan=document.createElement('canvas');tCan.width=tCan.height=TR;const tCtx=tCan.getContext('2d');
+const HG=new Float32Array(TR*TR),NZ=new Float32Array(TR*TR);
+for(let j=0;j<TR;j++)for(let i=0;i<TR;i++){const k=j*TR+i;HG[k]=H((i+.5)*100/TR,(j+.5)*100/TR);const s=Math.sin(k*12.9898)*43758.5453;NZ[k]=((s-Math.floor(s))-.5)*10}
+function renderTerrain(sea){
+  const img=tCtx.createImageData(TR,TR),d=img.data;
+  for(let k=0;k<TR*TR;k++){const h=HG[k],e=h-sea,n=NZ[k];let r,g,b;
+    if(e<-0.015){const t=clamp(-e/0.3,0,1);r=40-28*t;g=140-82*t;b=150-74*t}
+    else if(e<0){r=96;g=186;b=186}
+    else if(e<CROC_REACH){r=170;g=150;b=100}
+    else if(e<CROC_REACH+0.07){r=226;g=206;b=150}
+    else if(h<0.78){const t=clamp((h-0.2)/0.58,0,1);r=112-32*t;g=166-28*t;b=88-14*t}
+    else{const t=clamp((h-0.78)/0.25,0,1);r=122+28*t;g=126+22*t;b=100+28*t}
+    const i=k*4;d[i]=r+n;d[i+1]=g+n;d[i+2]=b+n;d[i+3]=255}
+  tCtx.putImageData(img,0,0);
+}
+function emoji(ch,x,y,size,alpha=1,g=ctx){g.globalAlpha=alpha;g.font=`${size}px ${EMOJI_FONT}`;g.textAlign='center';g.textBaseline='middle';g.fillStyle='#000';g.fillText(ch,x,y);g.globalAlpha=1}
+function bar(x,y,w,h,v,col){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(x,y,w,h);ctx.fillStyle=col;ctx.fillRect(x,y,w*v/100,h)}
+
+function draw(now){
+  const W=cv.width;if(!W)return;const u=W/100;
+  if(Math.abs(S.sea-lastSea)>0.003){renderTerrain(S.sea);lastSea=S.sea}
+  ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=true;ctx.drawImage(tCan,0,0,W,W);
+
+  for(const f of S.fires){const k=Math.min(1,(1-f.t/f.dur)*3),R=f.r*u*(1+0.05*Math.sin(now/90+f.x));
+    const g=ctx.createRadialGradient(f.x*u,f.y*u,0,f.x*u,f.y*u,R);
+    g.addColorStop(0,`rgba(255,196,80,${0.85*k})`);g.addColorStop(0.6,`rgba(232,90,40,${0.55*k})`);g.addColorStop(1,'rgba(232,90,40,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x*u,f.y*u,R,0,7);ctx.fill();
+    for(let i=0;i<3;i++){const a=i*2.1+f.x;emoji('🔥',(f.x+Math.cos(a)*2.4)*u,(f.y+Math.sin(a)*2.4)*u+Math.sin(now/120+i)*0.3*u,3.2*u,k)}}
+  for(const w of S.burrows){if(H(w.x,w.y)<=S.sea)continue;ctx.fillStyle='rgba(58,40,24,.85)';ctx.beginPath();ctx.ellipse(w.x*u,w.y*u,1.6*u,1*u,0,0,7);ctx.fill();
+    ctx.strokeStyle='rgba(120,92,58,.9)';ctx.lineWidth=Math.max(1,.3*u);ctx.stroke()}
+  if(S.spot&&H(S.spot.x,S.spot.y)>S.sea){ctx.strokeStyle='rgba(111,183,232,.8)';ctx.setLineDash([.6*u,.6*u]);ctx.lineWidth=Math.max(1,.3*u);ctx.beginPath();ctx.arc(S.spot.x*u,S.spot.y*u,2.6*u,0,7);ctx.stroke();ctx.setLineDash([])}
+  for(const k of S.carrots)emoji('🥕',k.x*u,k.y*u,3.2*u);
+  for(const g of S.gales){const a=1-g.t/g.dur;ctx.strokeStyle=`rgba(235,248,255,${0.75*a})`;ctx.lineWidth=Math.max(1.5,0.4*u);ctx.lineCap='round';
+    for(let i=0;i<16;i++){const ang=i/16*Math.PI*2+g.t*1.6,r0=(2+g.t*7+(i%3)*1.6)*u;ctx.beginPath();ctx.arc(g.x*u,g.y*u,r0,ang,ang+0.32);ctx.stroke()}}
+
+  const list=S.creatures.filter(c=>c.alive).sort((a,b)=>a.y-b.y);
+  const aiming=POWERS.find(p=>p.id===pending);
+  for(const c of list){
+    if(c.hidden){if(showMinds)emoji(c.emoji,c.x*u,c.y*u-.8*u,2.6*u,.35);continue}
+    const px=c.x*u,py=c.y*u,sz=c.size*u,bob=c.moving?Math.abs(Math.sin(now/110+c.seed*3))*0.7*u:0;
+    if(showMinds){ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(px,py,c.sight*u,0,7);ctx.stroke()}
+    if(c.kind==='croc'&&H(c.x,c.y)<S.sea){ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=Math.max(1,.3*u);ctx.beginPath();ctx.ellipse(px,py+.6*u,3.4*u+Math.sin(now/300)*.4*u,1.3*u,0,0,7);ctx.stroke()}
+    else{ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(px,py+sz*.42,sz*.34,sz*.12,0,0,7);ctx.fill()}
+    if(c.glow>0){ctx.strokeStyle=c.glowCol;ctx.globalAlpha=Math.min(1,c.glow);ctx.lineWidth=Math.max(2,.5*u);ctx.beginPath();ctx.arc(px,py,(3.4+(1.6-c.glow)*2)*u,0,7);ctx.stroke();ctx.globalAlpha=1}
+    if(aiming&&aiming.target==='creature'){ctx.setLineDash([.8*u,.8*u]);ctx.strokeStyle='rgba(243,180,67,.9)';ctx.lineWidth=Math.max(1.5,.35*u);ctx.beginPath();ctx.arc(px,py,(3.6+Math.sin(now/200)*.4)*u,0,7);ctx.stroke();ctx.setLineDash([])}
+    ctx.save();ctx.translate(px,py-bob);ctx.rotate(c.moving?Math.sin(now/140+c.seed)*0.07:0);emoji(c.emoji,0,0,sz);ctx.restore();
+    const ic=ICON[c.state];
+    if(ic){const bx=px+sz*.45,by=py-sz*.68;ctx.fillStyle='rgba(255,255,255,.93)';ctx.beginPath();ctx.arc(bx,by,1.55*u,0,7);ctx.fill();emoji(ic,bx,by+.1*u,1.9*u)}
+    if(showMinds){const bw=5*u,bh=Math.max(2,.55*u),bx=px-bw/2;let by=py+sz*.55;
+      bar(bx,by,bw,bh,drive(c,'hunger'),'#f3b443');by+=bh+1;
+      bar(bx,by,bw,bh,drive(c,'fear'),'#ea6a42');by+=bh+1;
+      if(c.kind==='human')bar(bx,by,bw,bh,c.thirst,'#6fb7e8')}
+  }
+  if(S.over&&S.over.victim){const v=S.over.victim,age=(now-endWall)/1000;
+    ctx.save();ctx.translate(v.x*u,v.y*u);ctx.rotate(Math.PI/2);emoji(v.emoji,0,0,v.size*u,.45);ctx.restore();
+    if(age<2.5)for(let i=0;i<2;i++){const r=(age*8+i*3)*u;ctx.strokeStyle=`rgba(234,106,66,${Math.max(0,1-age/2.5)})`;ctx.lineWidth=Math.max(2,.5*u);ctx.beginPath();ctx.arc(v.x*u,v.y*u,r,0,7);ctx.stroke()}}
+  if(S.flood&&S.flood.t<22){ctx.strokeStyle='rgba(190,225,245,.35)';ctx.lineWidth=Math.max(1,.2*u);ctx.beginPath();
+    for(let i=0;i<70;i++){const x=((i*37.3+now*0.03)%100)*u,y=((i*61.7+now*0.09)%100)*u;ctx.moveTo(x,y);ctx.lineTo(x-.6*u,y+2.4*u)}ctx.stroke()}
+  const k=clamp((S.t-90)/60,0,1);
+  if(k>0){ctx.fillStyle=`rgba(255,110,60,${0.16*k})`;ctx.fillRect(0,0,W,W);ctx.fillStyle=`rgba(20,10,45,${0.28*k*k})`;ctx.fillRect(0,0,W,W)}
+}
+
+let lastClock='';
+function updateClock(){const t=fmt(DAY-S.t);if(t!==lastClock){$('#clock').textContent=t;lastClock=t}$('#sunbar').style.width=clamp(S.t/DAY*100,0,100)+'%'}
+
+let lastT=performance.now(),acc=0,lastFlood=false;
+function frame(now){
+  const dt=Math.min(0.1,(now-lastT)/1000);lastT=now;
+  const playing=S&&!$('#play').hidden;
+  if(playing&&!S.paused&&!S.over){acc+=dt;while(acc>=0.05){step(0.05);acc-=0.05;if(S.over)break}
+    if(!!S.flood!==lastFlood){lastFlood=!!S.flood;renderRail()}}
+  else acc=0;
+  if(playing){draw(now);updateClock()}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function showReveal(){
+  const id=S.over.id,winners=players.filter(p=>p.fate.id===id);
+  $('#revHead').textContent=OUTCOME[id];
+  $('#revSub').textContent=winners.length?`${winners.map(w=>w.name).join(' and ')} saw it coming.`:'Nobody at the table foresaw this. The island wins.';
+  const rows=$('#rows');rows.innerHTML='';
+  for(const p of players){const win=p.fate.id===id;const r=document.createElement('div');r.className='row'+(win?' win':'');
+    r.innerHTML=`<span class="nm"><i class="dot" style="background:${p.color}"></i>${p.name}</span><span class="ft"></span><span class="sp">${win?'<span class="badge">Winner</span>':''}${p.spent} tokens spent</span>`;
+    r.querySelector('.ft').textContent=p.fate.text;rows.append(r)}
+  show('reveal');
+}
+</script>
+
+<script id="net">
+// ---------- Phone play over PeerJS: phones connect straight to this screen's browser ----------
+const BASE=location.origin+location.pathname;
+const PEER_OPTS=Object.assign({debug:0},window.PEER_OPTS||{});
+const KN=['rabbit','fox','human','croc'];
+const FATE_TEXT=Object.fromEntries(FATES.map(f=>[f.id,f.text]));
+const r1=v=>Math.round(v*10)/10;
+const idFor=code=>'isleofwhims-'+code;
+const hasPeer=typeof Peer!=='undefined';
+const ctrlMatch=/^#([a-z0-9]{6})-([1-5])$/.exec(location.hash);
+function safeSend(conn,obj){try{if(conn&&conn.open)conn.send(obj)}catch(e){}}
+
+if(!ctrlMatch){
+  // ===== HOST (the shared screen) =====
+  let peer=null,code='',ready=false,conns=new Map(),roundId='',acks={},seen=new Set(),lastSent='',retry=null;
+  if(hasPeer)$('#phonesBtn').disabled=false;
+  else $('#phonesNote').textContent='Phone play could not load. Check your internet connection and reload.';
+  const lobbyNote=t=>{$('#lobbyNote').textContent=t};
+  function genCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<6;i++)s+=a[Math.floor(Math.random()*a.length)];return s}
+  function openPeer(){
+    if(peer&&!peer.destroyed)return;
+    try{code=sessionStorage.getItem('iow-code')||''}catch(e){}
+    if(!/^[a-z0-9]{6}$/.test(code))code=genCode();
+    try{sessionStorage.setItem('iow-code',code)}catch(e){}
+    ready=false;lobbyNote('Connecting this screen…');
+    peer=new Peer(idFor(code),PEER_OPTS);
+    peer.on('open',()=>{ready=true;lobbyNote('Ready. Phones connect straight to this screen, so keep it open and awake.');if(!$('#lobby').hidden)drawQRs()});
+    peer.on('connection',conn=>{
+      conns.set(conn,{p:-1});
+      conn.on('data',d=>onData(conn,d));
+      conn.on('close',()=>{conns.delete(conn);renderLobby()});
+      conn.on('error',()=>{conns.delete(conn);renderLobby()});
+    });
+    peer.on('disconnected',()=>{if(!peer.destroyed)try{peer.reconnect()}catch(e){}});
+    peer.on('error',e=>{
+      if(e.type==='unavailable-id'){try{sessionStorage.removeItem('iow-code')}catch(_){}
+        peer.destroy();peer=null;setTimeout(openPeer,300);return}
+      if(e.type==='peer-unavailable')return;
+      if(['network','server-error','socket-error','socket-closed'].includes(e.type)){
+        lobbyNote('Cannot reach the connection service. Check this screen’s internet. Retrying…');
+        clearTimeout(retry);retry=setTimeout(()=>{if(peer&&peer.disconnected&&!peer.destroyed)try{peer.reconnect()}catch(_){}},3000)}
+    });
+  }
+  $('#phonesBtn').onclick=()=>{if(hasPeer){openPeer();startPhones()}};
+  $('#wakeBtn').onclick=()=>startGame();
+  $('#lobbyBack').onclick=()=>{mode='local';show('setup')};
+  window.startPhones=function(){
+    mode='phones';
+    const deck=shuffle(FATES.slice());
+    players=Array.from({length:playerCount},(_,i)=>({name:'Player '+(i+1),fate:deck[i],tokens:START_TOKENS,spent:0,color:PCOL[i]}));
+    roundId=Math.random().toString(36).slice(2,9);acks={};S=null;lastSent='';
+    show('lobby');drawQRs();renderLobby();push();
+  };
+  function drawQRs(){
+    const box=$('#qrs');box.innerHTML='';
+    players.forEach((p,i)=>{
+      const url=`${BASE}#${code}-${i+1}`;
+      const card=document.createElement('div');card.className='qcard';
+      card.innerHTML=`<p class="who" style="font-size:18px"><i class="dot" style="background:${p.color}"></i>${p.name}</p><div class="qr"></div><p class="qstat" data-p="${i}">Waiting for phone</p><p class="qlink"></p>`;
+      card.querySelector('.qlink').textContent=url;
+      try{const q=qrcode(0,'M');q.addData(url);q.make();card.querySelector('.qr').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true})}
+      catch(e){card.querySelector('.qr').hidden=true}
+      box.append(card);
+    });
+    renderLobby();
+  }
+  function renderLobby(){
+    const on=new Set();for(const v of conns.values())if(v.p>=0)on.add(v.p);
+    for(const el of document.querySelectorAll('.qstat')){const i=+el.dataset.p,c=on.has(i);el.textContent=c?'Phone connected':'Waiting for phone';el.classList.toggle('on',c)}
+  }
+  function onData(conn,d){
+    if(!d||typeof d!=='object')return;
+    const rec=conns.get(conn);if(!rec)return;
+    if(d.t==='hi'&&Number.isInteger(d.p)&&d.p>=0&&d.p<5){rec.p=d.p;renderLobby();safeSend(conn,{t:'st',g:state()});return}
+    if(d.t==='act')take(rec.p,d.a);
+  }
+  function take(pi,a){
+    if(mode!=='phones'||!a||typeof a!=='object'||a.r!==roundId||typeof a.id!=='string'||seen.has(a.id))return;
+    seen.add(a.id);
+    if(!Number.isInteger(pi)||pi<0||pi>=players.length)return;
+    if(!POWERS.some(P=>P.id===a.k))return;
+    let res;
+    if($('#play').hidden||!S)res={ok:false,msg:'The island is not awake yet.'};
+    else res=usePower(a.k,clamp(+a.x||50,0,100),clamp(+a.y||50,0,100),pi,true);
+    acks['p'+pi]={id:a.id,ok:res.ok?1:0,m:res.msg};push(true);
+  }
+  function phase(){
+    if(!$('#lobby').hidden)return'lobby';
+    if(!$('#play').hidden)return S&&S.over?'over':'play';
+    if(!$('#reveal').hidden)return'over';
+    return'lobby';
+  }
+  function state(){
+    const ph=phase();
+    const g={r:roundId,ph,n:players.length,pl:players.map(p=>[p.fate.id,p.tokens]),ack:acks};
+    if(S&&ph!=='lobby'){
+      g.t=Math.max(0,Math.ceil(DAY-S.t));g.sea=Math.round(S.sea*1000)/1000;g.fl=S.flood?1:0;
+      g.c=S.creatures.filter(c=>c.alive).map(c=>[KN.indexOf(c.kind),r1(c.x),r1(c.y),c.hidden?1:0]);
+      g.k=S.carrots.map(k=>[r1(k.x),r1(k.y)]);
+      g.f=S.fires.map(f=>[r1(f.x),r1(f.y)]);
+      g.b=S.burrows.map(b=>[r1(b.x),r1(b.y)]);
+      g.w=S.spot?[r1(S.spot.x),r1(S.spot.y)]:null;
+      if(S.over)g.out=S.over.id;
+    }
+    return g;
+  }
+  function push(force){
+    if(mode!=='phones'||!conns.size)return;
+    const msg={t:'st',g:state()},s=JSON.stringify(msg);
+    if(!force&&s===lastSent)return;lastSent=s;
+    for(const [c,v] of conns)if(v.p>=0)safeSend(c,msg);
+  }
+  setInterval(push,120);
+  setInterval(()=>{lastSent=''},2000);
+}else{
+  // ===== PHONE CONTROLLER =====
+  const code=ctrlMatch[1],pi=+ctrlMatch[2]-1;
+  let peer=null,conn=null,st=null,fateShown=false,cPending=null,myAct=null,lastRound='',retry=null,linked=false,missing=false;
+  const ccv=$('#ccv'),cctx=ccv.getContext('2d');
+  $('#cWho').innerHTML=`<i class="dot" style="background:${PCOL[pi]}"></i>Player ${pi+1}`;
+  show('ctrl');
+  $('#cFate').onclick=()=>{fateShown=!fateShown;renderCtrl()};
+  const cHint=(t,cls='')=>{const e=$('#cHint');e.textContent=t;e.className='hint'+(cls?' '+cls:'')};
+  const setStatus=t=>{$('#cStatus').textContent=t};
+  function sizeC(){const r=ccv.getBoundingClientRect(),w=Math.round(r.width*Math.min(2,devicePixelRatio||1));if(w>0&&ccv.width!==w){ccv.width=ccv.height=w;drawC()}}
+  new ResizeObserver(sizeC).observe(ccv);
+  function later(ms){clearTimeout(retry);retry=setTimeout(link,ms)}
+  function link(){
+    if(!hasPeer){setStatus('This phone could not load the game. Check your internet and reload.');return}
+    if(!peer||peer.destroyed){
+      peer=new Peer(PEER_OPTS);
+      peer.on('open',()=>link());
+      peer.on('disconnected',()=>{if(!peer.destroyed)try{peer.reconnect()}catch(e){}});
+      peer.on('error',e=>{
+        if(e.type==='peer-unavailable'){missing=true;setStatus('Can’t find this island. Check the main screen is still open, or scan the code again.');later(3000);return}
+        setStatus('Connection problem. Retrying…');later(3000);
+      });
+      return;
+    }
+    if(!peer.open){later(1500);return}
+    if(conn&&conn.open)return;
+    if(!missing)setStatus('Connecting to the island…');
+    conn=peer.connect(idFor(code),{serialization:'json',reliable:true});
+    conn.on('open',()=>{linked=true;missing=false;safeSend(conn,{t:'hi',p:pi});renderCtrl()});
+    conn.on('data',d=>{
+      if(!d||d.t!=='st'||!d.g)return;
+      st=d.g;
+      if(st.r!==lastRound){lastRound=st.r;fateShown=false;cPending=null;myAct=null;cHint('Pick a nudge, then tap the map.')}
+      renderCtrl();
+    });
+    conn.on('close',()=>{linked=false;setStatus('Lost the island. Reconnecting…');later(1500)});
+    conn.on('error',()=>{linked=false;later(2000)});
+  }
+  link();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!(conn&&conn.open))link()});
+  function me(){return st&&Array.isArray(st.pl)&&st.pl[pi]?st.pl[pi]:null}
+  function renderCtrl(){
+    const m=me();
+    let status;
+    if(!linked)status=missing?'Can\u2019t find this island. Check the main screen is still open, or scan the code again.':'Connecting to the island…';
+    else if(!st)status='Connected. Waiting for the main screen.';
+    else if(!m)status=`This round has ${st.n} gods. Ask the host to add more players.`;
+    else if(st.ph==='lobby')status='Read your fate, keep it secret, and wait for the island to wake.';
+    else if(st.ph==='play')status='The island is awake. Nudge it your way.';
+    else{const won=st.out===m[0];status=`${OUTCOME[st.out]||'The round is over.'} ${won?'Your fate came true. You win!':'Not your fate this time.'}`}
+    setStatus(status);
+    $('#cTok').textContent=m?`${m[1]} tokens`:'';
+    $('#cFateText').textContent=!m?'—':fateShown||st.ph==='over'?(FATE_TEXT[m[0]]||'?'):'Tap to show';
+    $('#cClock').textContent=st&&st.t!=null&&st.ph!=='lobby'?`${fmt(st.t)} until sunset`:'';
+    const live=!!(linked&&m&&st.ph==='play');
+    const box=$('#cPowers');box.innerHTML='';
+    for(const P of POWERS){const b=document.createElement('button');b.className='power';
+      b.disabled=!live||m[1]<P.cost||(P.id==='monsoon'&&st.fl);
+      b.setAttribute('aria-pressed',cPending===P.id);
+      b.innerHTML=`<span class="top"><b>${P.name}</b><span class="cost">${P.cost}</span></span><small>${P.desc}</small>`;
+      b.onclick=()=>{if(P.target==='none'){send(P.id,50,50);return}cPending=cPending===P.id?null:P.id;
+        cHint(cPending?(P.target==='creature'?`Tap a creature on the map for ${P.name}.`:P.target==='land'?`Tap dry land on the map for ${P.name}.`:`Tap the map where the ${P.name} should blow.`):'Pick a nudge, then tap the map.');renderCtrl()};
+      box.append(b)}
+    if(st&&st.ack&&myAct){const a=st.ack['p'+pi];if(a&&a.id===myAct){cHint(a.m,a.ok?'ok':'bad');myAct=null}}
+    drawC();
+  }
+  function send(k,x,y){
+    if(!conn||!conn.open||!st||st.ph!=='play'){cHint('Not connected to the island yet.','bad');return}
+    myAct=Math.random().toString(36).slice(2,10);
+    safeSend(conn,{t:'act',a:{r:st.r,id:myAct,k,x:r1(x),y:r1(y)}});
+    cPending=null;cHint('Sent to the island…');renderCtrl();
+  }
+  ccv.addEventListener('pointerdown',e=>{
+    if(!cPending||!st||st.ph!=='play')return;
+    const r=ccv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*100,y=(e.clientY-r.top)/r.height*100;
+    const P=POWERS.find(p=>p.id===cPending),sea=st.sea||0;
+    if(P.target==='creature'){
+      let best=null;for(const c of st.c||[]){const d=Math.hypot(c[1]-x,c[2]-y);if(d<12&&(!best||d<best.d))best={c,d}}
+      if(!best){cHint('Tap closer to a creature.','bad');return}
+      send(P.id,best.c[1],best.c[2]);
+    }else if(P.target==='land'&&H(x,y)<=sea+0.05){cHint(P.id==='lure'?'Lures only grow on dry land.':'Fire needs dry ground.','bad')}
+    else send(P.id,x,y);
+  });
+  let cSea=-1;
+  function drawC(){
+    const W=ccv.width;if(!W)return;const u=W/100,g=cctx,sea=st&&st.sea!=null?st.sea:0;
+    if(Math.abs(sea-cSea)>0.003){renderTerrain(sea);cSea=sea}
+    g.setTransform(1,0,0,1,0,0);g.drawImage(tCan,0,0,W,W);
+    if(!st||st.ph==='lobby'||!st.c){g.fillStyle='rgba(5,20,26,.55)';g.fillRect(0,0,W,W);return}
+    for(const f of st.f||[]){const gr=g.createRadialGradient(f[0]*u,f[1]*u,0,f[0]*u,f[1]*u,6.5*u);gr.addColorStop(0,'rgba(255,196,80,.85)');gr.addColorStop(1,'rgba(232,90,40,0)');g.fillStyle=gr;g.beginPath();g.arc(f[0]*u,f[1]*u,6.5*u,0,7);g.fill();emoji('🔥',f[0]*u,f[1]*u,4*u,1,g)}
+    for(const b of st.b||[]){if(H(b[0],b[1])<=sea)continue;g.fillStyle='rgba(58,40,24,.85)';g.beginPath();g.ellipse(b[0]*u,b[1]*u,1.8*u,1.1*u,0,0,7);g.fill()}
+    if(st.w&&H(st.w[0],st.w[1])>sea){g.strokeStyle='rgba(111,183,232,.85)';g.setLineDash([u,u]);g.lineWidth=Math.max(1,.4*u);g.beginPath();g.arc(st.w[0]*u,st.w[1]*u,2.8*u,0,7);g.stroke();g.setLineDash([])}
+    for(const k of st.k||[])emoji('🥕',k[0]*u,k[1]*u,4*u,1,g);
+    const P=POWERS.find(p=>p.id===cPending);
+    for(const c of st.c){const kind=KIND[KN[c[0]]];if(!kind)continue;
+      if(P&&P.target==='creature'&&!c[3]){g.setLineDash([u,u]);g.strokeStyle='rgba(243,180,67,.95)';g.lineWidth=Math.max(1.5,.45*u);g.beginPath();g.arc(c[1]*u,c[2]*u,4.6*u,0,7);g.stroke();g.setLineDash([])}
+      emoji(kind.emoji,c[1]*u,c[2]*u,(c[3]?3.4:kind.size*1.25)*u,c[3]?.4:1,g)}
+    if(st.fl){g.fillStyle='rgba(111,183,232,.08)';g.fillRect(0,0,W,W)}
+  }
+}
+</script>
+</body>
+</html>
