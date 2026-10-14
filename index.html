@@ -235,7 +235,7 @@ canvas.aiming{cursor:crosshair}
   <section id="ctrl" class="screen ctrl" hidden>
     <div class="chead"><p id="cWho" class="who"></p><span id="cTok" class="ctok"></span></div>
     <p id="cStatus" class="cstatus">Connecting to the island…</p>
-    <button id="cFate" class="fatebtn"><small>Your secret fate</small><b id="cFateText">Tap to show</b></button>
+    <button id="cFate" class="fatebtn"><small id="cFateLabel">Your secret fate</small><b id="cFateText">Tap to show</b></button>
     <div class="topbar"><span id="cClock" class="cclock"></span></div>
     <div id="cPowers" class="powers"></div>
     <p id="cHint" class="hint">Pick a nudge, then tap the map.</p>
@@ -884,9 +884,10 @@ if(!ctrlMatch){
     else if(!m)status=`This round has ${st.n} gods. Ask the host to add more players.`;
     else if(st.ph==='lobby')status='Read your fate, keep it secret, and wait for the island to wake.';
     else if(st.ph==='play')status='The island is awake. Nudge it your way.';
-    else{const won=st.out===m[0];status=`${OUTCOME[st.out]||'The round is over.'} ${won?'Your fate came true. You win!':'Not your fate this time.'}`}
+    else{const won=st.out===m[0];status=`What happened: ${OUTCOME[st.out]||'The round is over.'} ${won?'That was your fate. You win!':'Not your fate, so no win this time.'}`}
     setStatus(status);
     $('#cTok').textContent=m?`${m[1]} tokens`:'';
+    $('#cFateLabel').textContent=st&&st.ph==='over'?'Your fate was':'Your secret fate';
     $('#cFateText').textContent=!m?'—':fateShown||st.ph==='over'?(FATE_TEXT[m[0]]||'?'):'Tap to show';
     $('#cClock').textContent=st&&st.t!=null&&st.ph!=='lobby'?`${fmt(st.t)} until sunset`:'';
     const live=!!(linked&&m&&st.ph==='play');
