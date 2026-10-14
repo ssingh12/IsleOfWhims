@@ -303,7 +303,7 @@ function coastPoint(x,y,landSide){ // walk out from the centre along this creatu
 }
 
 function newSim(){
-  S={t:0,tick:0,sea:0,flood:null,creatures:[],carrots:[],fires:[],gales:[],carrotsEaten:0,carrotTimer:0,over:null,paused:false,touch:{},nid:0,burrows:[],spot:null};
+  S={t:0,tick:0,sea:0,flood:null,creatures:[],carrots:[],fires:[],gales:[],carrotsEaten:0,carrotTimer:0,over:null,paused:false,touch:{},nid:0,burrows:[],spot:null,puffs:[]};
   const add=(kind,p)=>{const k=KIND[kind];
     const c={id:S.nid++,kind,...k,x:p.x,y:p.y,ix:0,iy:0,stamina:k.stam,tired:false,hunger:rand(15,35),thirst:kind==='human'?rand(25,40):0,
       fear:0,state:'wander',wx:p.x,wy:p.y,wtime:0,nudges:[],alive:true,glow:0,glowCol:'#fff',seed:Math.random()*10,moving:false,halt:false,wantSprint:false};
@@ -317,7 +317,7 @@ function newSim(){
   const r2=add('rabbit',landPoint(0.2,0.6,[r1],12));
   add('fox',landPoint(0.25,0.7,[r1,r2],30));
   add('croc',coastPoint(50+rand(-8,8),95,false));
-  for(let i=0;i<5;i++)S.carrots.push(landPoint(0.22,0.65));
+  for(let i=0;i<5;i++)S.carrots.push(landPoint(0.22,0.65,S.burrows,5));
 }
 
 function drive(c,key){ // Drive_final = (D_base * I_divine) + F_decay, with the nudge fading over its duration
@@ -462,12 +462,12 @@ function interactions(){
   for(const a of al)for(const b of al){if(a===b)continue;const d=Math.hypot(a.x-b.x,a.y-b.y);
     if(a.kind==='fox'&&b.kind==='rabbit'&&d<1.2)return end('fox_rabbit',b);
     if(a.kind==='croc'&&b.kind!=='croc'&&d<2)return end('croc_'+b.kind,b)}
-  for(const c of al){
-    if(c.kind!=='rabbit'&&c.kind!=='human')continue;
-    if(drive(c,'hunger')<(c.kind==='rabbit'?20:50))continue;
+  for(const c of S.creatures){
+    if(!c.alive||(c.kind!=='rabbit'&&c.kind!=='human'))continue;
+    if(c.kind==='human'&&drive(c,'hunger')<50)continue;
     const i=S.carrots.findIndex(k=>Math.hypot(k.x-c.x,k.y-c.y)<1.8);
     if(i<0)continue;
-    S.carrots.splice(i,1);c.hunger=Math.max(0,c.hunger-70);c.nudges=c.nudges.filter(n=>n.key!=='hunger');
+    const ate=S.carrots.splice(i,1)[0];S.puffs.push({x:ate.x,y:ate.y,t:0});c.hunger=Math.max(0,c.hunger-70);c.nudges=c.nudges.filter(n=>n.key!=='hunger');
     if(c.kind==='rabbit'){S.carrotsEaten++;emitLog(`A rabbit munches a carrot (${S.carrotsEaten} of ${CARROT_GOAL}).`);
       if(S.carrotsEaten>=CARROT_GOAL)return end('carrots')}
     else emitLog('The human eats a carrot.');
@@ -481,7 +481,8 @@ function step(dt){
   S.carrots=S.carrots.filter(k=>H(k.x,k.y)>S.sea+0.02&&!inFire(k.x,k.y));
   for(const f of S.fires)f.t+=dt; S.fires=S.fires.filter(f=>f.t<f.dur&&H(f.x,f.y)>S.sea);
   for(const g of S.gales)g.t+=dt; S.gales=S.gales.filter(g=>g.t<g.dur);
-  S.carrotTimer+=dt;if(S.carrotTimer>7){S.carrotTimer=0;if(S.carrots.length<6)S.carrots.push(landPoint(0.22,0.65))}
+  for(const q of S.puffs)q.t+=dt; S.puffs=S.puffs.filter(q=>q.t<0.9);
+  S.carrotTimer+=dt;if(S.carrotTimer>7){S.carrotTimer=0;if(S.carrots.length<6)S.carrots.push(landPoint(0.22,0.65,S.burrows,5))}
   if(S.tick%5===0)for(const c of S.creatures)if(c.alive)decide(c); // brains think 4x a second
   for(const c of S.creatures)if(c.alive)physics(c,dt);
   interactions();
@@ -660,6 +661,8 @@ function draw(now){
     ctx.strokeStyle='rgba(120,92,58,.9)';ctx.lineWidth=Math.max(1,.3*u);ctx.stroke()}
   if(S.spot&&H(S.spot.x,S.spot.y)>S.sea){ctx.strokeStyle='rgba(111,183,232,.8)';ctx.setLineDash([.6*u,.6*u]);ctx.lineWidth=Math.max(1,.3*u);ctx.beginPath();ctx.arc(S.spot.x*u,S.spot.y*u,2.6*u,0,7);ctx.stroke();ctx.setLineDash([])}
   for(const k of S.carrots)emoji('🥕',k.x*u,k.y*u,3.2*u);
+  for(const q of S.puffs){const a=1-q.t/0.9;ctx.fillStyle=`rgba(240,140,50,${a})`;
+    for(let i=0;i<6;i++){const ang=i*1.047+q.x,r=(0.8+q.t*5)*u;ctx.beginPath();ctx.arc(q.x*u+Math.cos(ang)*r,q.y*u+Math.sin(ang)*r,Math.max(1,0.45*u*a),0,7);ctx.fill()}}
   for(const g of S.gales){const a=1-g.t/g.dur;ctx.strokeStyle=`rgba(235,248,255,${0.75*a})`;ctx.lineWidth=Math.max(1.5,0.4*u);ctx.lineCap='round';
     for(let i=0;i<16;i++){const ang=i/16*Math.PI*2+g.t*1.6,r0=(2+g.t*7+(i%3)*1.6)*u;ctx.beginPath();ctx.arc(g.x*u,g.y*u,r0,ang,ang+0.32);ctx.stroke()}}
 
